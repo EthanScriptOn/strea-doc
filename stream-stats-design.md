@@ -43,10 +43,6 @@ flowchart TD
         A --> B --> C --> D --> E
     end
 
-    PG_ARCHIVE[("**PostgreSQL**
-    原始事件归档
-    用于 Replay 和数仓 ETL")]
-
     ES[("**Elasticsearch**
     窗口聚合结果
     秒级实时查询 / 监控看板")]
@@ -73,10 +69,8 @@ flowchart TD
     end
 
     DB --> DBZ --> MQ --> A
-    A -- "归档原始消息" --> PG_ARCHIVE
     D -- "实时窗口结果" --> ES
     D -- "窗口结果写入 ODS" --> ODS
-    PG_ARCHIVE -- "定时 ETL 补充明细" --> ODS
 ```
 
 ---
@@ -85,11 +79,8 @@ flowchart TD
 
 ```mermaid
 flowchart LR
-    PG[("PostgreSQL
-    原始事件归档")]
-
     RP["**Replayer**
-    按时间范围从归档读取历史事件
+    按时间范围读取历史事件
     绕过 RabbitMQ，重新投入 Pipeline"]
 
     ISO["**隔离输出**
@@ -97,7 +88,7 @@ flowchart LR
     数仓：独立表名后缀 _replay
     不覆盖任何线上数据"]
 
-    PG --> RP --> ISO
+    RP --> ISO
 ```
 
 ---
@@ -114,7 +105,6 @@ flowchart LR
 | **Aggregation** | 在每个窗口内计算 COUNT / SUM / AVG / UV / P99 |
 | **Checkpoint** | 定期保存计算状态到 PG，支持故障恢复 |
 | **Elasticsearch** | 存储窗口结果，供实时监控 / 看板查询 |
-| **PostgreSQL 归档** | 存储原始事件，同时作为 Replay 和数仓 ETL 的数据来源 |
 | **数仓 ODS 层** | 原始数据贴源入库，保留完整明细 |
 | **数仓 DWD 层** | 清洗去重，关联用户 / 商品 / 地区维度表 |
 | **数仓 DWS 层** | 多维度聚合汇总宽表 |
