@@ -7,7 +7,7 @@
 ## 整体数据流
 
 ```mermaid
-flowchart TD
+flowchart LR
     DB[("`业务数据库
     MongoDB / MySQL`")]
 
@@ -37,14 +37,10 @@ flowchart TD
         每个窗口独立计算
         COUNT / SUM / AVG / UV / P99"]
 
-        E["**⑤ Checkpoint**
-        定期将窗口计算状态存入 PostgreSQL
-        服务重启后可从此恢复，无需重算"]
-
-        A --> B --> C --> D --> E
+        A --> B --> C --> D
     end
 
-    subgraph DW["数仓加工层（ClickHouse / Doris）"]
+    subgraph DW["数仓加工层"]
         direction TB
         ODS["**ODS 层**
         原始数据原样入库"]
