@@ -8,63 +8,33 @@
 
 ```mermaid
 flowchart LR
-    DB[("`业务数据库
-    MongoDB / MySQL`")]
+    DB[("業務数据库<br/>MongoDB / MySQL")]
 
-    DBZ1["**Debezium CDC（一次）**
-    监听业务数据库变更
-    封装成标准消息"]
+    DBZ1["Debezium CDC 一次<br/>监听业务数据库变更<br/>封装成标准消息"]
 
-    MQ["**RabbitMQ**
-    独立队列接收 CDC 消息
-    与业务消费者隔离"]
+    MQ["RabbitMQ<br/>独立队列接收 CDC 消息<br/>与业务消费者隔离"]
 
     subgraph STREAM["流式统计模块"]
         direction TB
-        A["**① Source**
-        消费 RabbitMQ 消息"]
-
-        B["**② Normalize**
-        将 Debezium JSON 解析为
-        统一的 Event 结构体"]
-
-        C["**③ Window Engine**
-        按事件时间分配到窗口
-        支持乱序容忍（Watermark）
-        滚动窗口 / 滑动窗口"]
-
-        D["**④ Aggregation**
-        每个窗口独立计算
-        COUNT / SUM / AVG / UV / P99"]
-
+        A["① Source<br/>消费 RabbitMQ 消息"]
+        B["② Normalize<br/>Debezium JSON 解析为<br/>统一 Event 结构体"]
+        C["③ Window Engine<br/>按事件时间分配到窗口<br/>支持乱序容忍 Watermark<br/>滚动窗口 / 滑动窗口"]
+        D["④ Aggregation<br/>每个窗口独立计算<br/>COUNT / SUM / AVG / UV / P99"]
         A --> B --> C --> D
     end
 
     subgraph DW["数仓加工层"]
         direction TB
-        ODS["**ODS 层**
-        原始数据原样入库"]
-
-        DWD["**DWD 层**
-        清洗 + 关联维度表"]
-
-        DWS["**DWS 层**
-        多维度聚合汇总宽表"]
-
-        ADS["**ADS 层**
-        漏斗 / 留存 / GMV / DAU
-        BI 报表 / 对外 API"]
-
+        ODS["ODS 层<br/>原始数据原样入库"]
+        DWD["DWD 层<br/>清洗 + 关联维度表"]
+        DWS["DWS 层<br/>多维度聚合汇总宽表"]
+        ADS["ADS 层<br/>漏斗 / 留存 / GMV / DAU<br/>BI 报表 / 对外 API"]
         ODS --> DWD --> DWS --> ADS
     end
 
-    ES["**Elasticsearch**
-    查询数仓数据
-    提供全文检索 / 监控看板"]
+    ES["Elasticsearch<br/>查询数仓数据<br/>提供全文检索 / 监控看板"]
 
-    DBZ2["**Debezium CDC（二次）**
-    监听数仓表变更
-    触发二次流式计算"]
+    DBZ2["Debezium CDC 二次<br/>监听数仓表变更<br/>触发二次流式计算"]
 
     DB --> DBZ1 --> MQ --> A
     D -- "窗口结果写入" --> ODS
@@ -81,26 +51,11 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    DWS[("数仓 DWS / ADS 层
-    聚合结果落地")]
-
-    DBZ2["**Debezium CDC（二次）**
-    监听数仓表的 INSERT / UPDATE
-    封装为新的 CDC 事件"]
-
-    MQ["**RabbitMQ**
-    同一队列复用
-    或配置独立队列隔离"]
-
-    STREAM["**流式统计模块**
-    复用同一套 Pipeline
-    通过 source-filter 区分
-    一次 / 二次计算事件"]
-
-    OUT["**输出**
-    二次聚合结果写回数仓
-    或写入独立指标表"]
-
+    DWS[("数仓 DWS / ADS 层<br/>聚合结果落地")]
+    DBZ2["Debezium CDC 二次<br/>监听数仓表 INSERT / UPDATE<br/>封装为新的 CDC 事件"]
+    MQ["RabbitMQ<br/>同一队列复用<br/>或配置独立队列隔离"]
+    STREAM["流式统计模块<br/>复用同一套 Pipeline<br/>通过 source-filter 区分<br/>一次 / 二次计算事件"]
+    OUT["输出<br/>二次聚合结果写回数仓<br/>或写入独立指标表"]
     DWS --> DBZ2 --> MQ --> STREAM --> OUT
 ```
 
@@ -110,15 +65,8 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    RP["**Replayer**
-    按时间范围读取历史事件
-    绕过 RabbitMQ，重新投入 Pipeline"]
-
-    ISO["**隔离输出**
-    ES：独立 index 后缀 _replay
-    数仓：独立表名后缀 _replay
-    不覆盖任何线上数据"]
-
+    RP["Replayer<br/>按时间范围读取历史事件<br/>绕过 RabbitMQ 重新投入 Pipeline"]
+    ISO["隔离输出<br/>ES 独立 index 后缀 _replay<br/>数仓独立表名后缀 _replay<br/>不覆盖任何线上数据"]
     RP --> ISO
 ```
 
