@@ -7,7 +7,8 @@
 ## 整体数据流
 
 ```mermaid
-flowchart TB
+%%{init: {"flowchart": {"defaultRenderer": "elk"}}}%%
+flowchart LR
     DB[("业务数据库<br/>MongoDB / MySQL")]
     DBZ1["Debezium CDC 一次<br/>监听数据库变更"]
     MQ["RabbitMQ<br/>独立队列隔离"]
@@ -16,24 +17,22 @@ flowchart TB
 
     DB --> DBZ1 --> MQ
 
-    subgraph MAIN[" "]
-        direction LR
-        subgraph STREAM["流式统计模块"]
-            direction TB
-            A["① Source<br/>消费 MQ 消息"]
-            B["② Normalize<br/>解析为统一 Event 结构"]
-            C["③ Window Engine<br/>窗口分配 + 乱序容忍"]
-            D["④ Aggregation<br/>COUNT / SUM / AVG / UV / P99"]
-            A --> B --> C --> D
-        end
-        subgraph DW["数仓加工层"]
-            direction TB
-            ODS["ODS 层<br/>原始数据原样入库"]
-            DWD["DWD 层<br/>清洗 + 关联维度表"]
-            DWS["DWS 层<br/>多维度聚合汇总宽表"]
-            ADS["ADS 层<br/>漏斗 / 留存 / GMV / BI 报表"]
-            ODS --> DWD --> DWS --> ADS
-        end
+    subgraph STREAM["流式统计模块"]
+        direction TB
+        A["① Source<br/>消费 MQ 消息"]
+        B["② Normalize<br/>解析为统一 Event 结构"]
+        C["③ Window Engine<br/>窗口分配 + 乱序容忍"]
+        D["④ Aggregation<br/>COUNT / SUM / AVG / UV / P99"]
+        A --> B --> C --> D
+    end
+
+    subgraph DW["数仓加工层"]
+        direction TB
+        ODS["ODS 层<br/>原始数据原样入库"]
+        DWD["DWD 层<br/>清洗 + 关联维度表"]
+        DWS["DWS 层<br/>多维度聚合汇总宽表"]
+        ADS["ADS 层<br/>漏斗 / 留存 / GMV / BI 报表"]
+        ODS --> DWD --> DWS --> ADS
     end
 
     MQ --> A
