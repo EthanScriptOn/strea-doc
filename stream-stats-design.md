@@ -1,6 +1,6 @@
 # 离线流式统计计算模块 — 架构概览
 
-**版本：** v1.1　　**日期：** 2026-03-09
+**版本：** v1.2　　**日期：** 2026-03-09
 
 ---
 
@@ -47,55 +47,36 @@ flowchart TD
     原始事件归档
     用于 Replay 和数仓 ETL")]
 
-    subgraph OUTPUT["结果输出（双路并行）"]
-        ES["**Sink → Elasticsearch**
-        窗口聚合结果
-        秒级实时查询 / 监控看板"]
+    ES[("**Elasticsearch**
+    窗口聚合结果
+    秒级实时查询 / 监控看板")]
 
-        DW["**Sink → 数仓**
-        窗口聚合结果 + 原始明细 ETL
-        用于二次加工分析"]
+    subgraph DW["数仓二次加工层（ClickHouse / Doris）"]
+        direction TB
+        ODS["**ODS 层**
+        原始数据原样入库
+        保留完整历史明细"]
+
+        DWD["**DWD 层**
+        清洗 + 去重
+        关联用户 / 商品 / 地区等维度表"]
+
+        DWS["**DWS 层**
+        多维度聚合汇总
+        按渠道 / 地区 / SKU / 天 / 周 / 月"]
+
+        ADS["**ADS 层**
+        最终应用指标
+        漏斗 / 留存 / GMV / DAU / BI 报表"]
+
+        ODS --> DWD --> DWS --> ADS
     end
 
     DB --> DBZ --> MQ --> A
     A -- "归档原始消息" --> PG_ARCHIVE
-    D -- "窗口结果" --> ES
-    D -- "窗口结果" --> DW
-    PG_ARCHIVE -- "定时 ETL" --> DW
-```
-
----
-
-## 数仓二次加工层
-
-```mermaid
-flowchart LR
-    DW_IN["来自流式模块的
-    窗口聚合结果
-    +
-    PostgreSQL 原始明细 ETL"]
-
-    ODS["**ODS 层**
-    原始数据原样入库
-    保留完整历史明细"]
-
-    DWD["**DWD 层**
-    清洗 + 去重
-    关联用户 / 商品 / 地区等维度表
-    构建宽事实表"]
-
-    DWS["**DWS 层**
-    多维度聚合汇总
-    按渠道 / 地区 / SKU
-    按天 / 周 / 月"]
-
-    ADS["**ADS 层**
-    最终应用指标
-    漏斗分析 / 用户留存
-    GMV / DAU / 转化率
-    BI 报表 / 对外 API"]
-
-    DW_IN --> ODS --> DWD --> DWS --> ADS
+    D -- "实时窗口结果" --> ES
+    D -- "窗口结果写入 ODS" --> ODS
+    PG_ARCHIVE -- "定时 ETL 补充明细" --> ODS
 ```
 
 ---
@@ -132,8 +113,10 @@ flowchart LR
 | **Window Engine** | 按事件时间分窗口，处理乱序，触发计算 |
 | **Aggregation** | 在每个窗口内计算 COUNT / SUM / AVG / UV / P99 |
 | **Checkpoint** | 定期保存计算状态到 PG，支持故障恢复 |
-| **Sink ES** | 将窗口结果写入 ES，供实时监控使用 |
-| **Sink DW** | 将窗口结果写入数仓 ODS 层，供二次加工 |
+| **Elasticsearch** | 存储窗口结果，供实时监控 / 看板查询 |
 | **PostgreSQL 归档** | 存储原始事件，同时作为 Replay 和数仓 ETL 的数据来源 |
-| **数仓 ODS→ADS** | 原始贴源→清洗关联→多维汇总→最终指标，支持复杂分析 |
+| **数仓 ODS 层** | 原始数据贴源入库，保留完整明细 |
+| **数仓 DWD 层** | 清洗去重，关联用户 / 商品 / 地区维度表 |
+| **数仓 DWS 层** | 多维度聚合汇总宽表 |
+| **数仓 ADS 层** | 最终业务指标，对接 BI 报表 / 对外 API |
 | **Replayer** | 从归档读取历史数据，重走计算流程，结果写入隔离存储 |
