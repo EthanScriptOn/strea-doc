@@ -7,7 +7,7 @@
 ## 整体数据流
 
 ```mermaid
-flowchart LR
+flowchart TB
     DB[("业务数据库<br/>MongoDB / MySQL")]
     DBZ1["Debezium CDC 一次<br/>监听数据库变更"]
     MQ["RabbitMQ<br/>独立队列隔离"]
@@ -15,7 +15,6 @@ flowchart LR
     ES["Elasticsearch<br/>查询数仓数据<br/>全文检索 / 监控看板"]
 
     subgraph STREAM["流式统计模块"]
-        direction TB
         A["① Source<br/>消费 MQ 消息"]
         B["② Normalize<br/>解析为统一 Event 结构"]
         C["③ Window Engine<br/>窗口分配 + 乱序容忍"]
@@ -24,7 +23,6 @@ flowchart LR
     end
 
     subgraph DW["数仓加工层"]
-        direction TB
         ODS["ODS 层<br/>原始数据原样入库"]
         DWD["DWD 层<br/>清洗 + 关联维度表"]
         DWS["DWS 层<br/>多维度聚合汇总宽表"]
@@ -32,7 +30,7 @@ flowchart LR
         ODS --> DWD --> DWS --> ADS
     end
 
-    DB --> DBZ1 --> MQ --> STREAM
+    DB --> DBZ1 --> MQ --> A
     D -- "窗口结果写入" --> ODS
     ADS -- "数据同步" --> ES
     DWS --> DBZ2
