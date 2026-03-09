@@ -54,29 +54,6 @@ flowchart TB
     </div>
   </div>
 
-  <div class="section">
-    <h2>二次计算说明</h2>
-    <div class="mermaid">
-flowchart LR
-    DWS[("数仓 DWS / ADS 层<br/>聚合结果落地")]
-    DBZ2["Debezium CDC 二次<br/>监听数仓表变更<br/>封装为新的 CDC 事件"]
-    MQ["RabbitMQ<br/>同一队列复用<br/>或配置独立队列隔离"]
-    STREAM["流式统计模块<br/>复用同一套 Pipeline<br/>source-filter 区分一次/二次事件"]
-    OUT["输出<br/>二次聚合结果写回数仓<br/>或写入独立指标表"]
-    DWS --> DBZ2 --> MQ --> STREAM --> OUT
-    </div>
-  </div>
-
-  <div class="section">
-    <h2>Replay 历史重算</h2>
-    <div class="mermaid">
-flowchart LR
-    RP["Replayer<br/>按时间范围读取历史事件<br/>绕过 RabbitMQ 重新投入 Pipeline"]
-    ISO["隔离输出<br/>ES 独立 index 后缀 _replay<br/>数仓独立表名后缀 _replay<br/>不覆盖任何线上数据"]
-    RP --> ISO
-    </div>
-  </div>
-
   <script>mermaid.initialize({ startOnLoad: true, theme: 'default' })</script>
 </body>
 </html>
