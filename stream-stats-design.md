@@ -8,19 +8,16 @@
 
 ```mermaid
 flowchart LR
-    DB[("業務数据库<br/>MongoDB / MySQL")]
-
-    DBZ1["Debezium CDC 一次<br/>监听业务数据库变更<br/>封装成标准消息"]
-
-    MQ["RabbitMQ<br/>独立队列接收 CDC 消息<br/>与业务消费者隔离"]
-
     subgraph STREAM["流式统计模块"]
         direction TB
-        A["① Source<br/>消费 RabbitMQ 消息"]
-        B["② Normalize<br/>Debezium JSON 解析为<br/>统一 Event 结构体"]
-        C["③ Window Engine<br/>按事件时间分配到窗口<br/>支持乱序容忍 Watermark<br/>滚动窗口 / 滑动窗口"]
-        D["④ Aggregation<br/>每个窗口独立计算<br/>COUNT / SUM / AVG / UV / P99"]
-        A --> B --> C --> D
+        DB[("业务数据库<br/>MongoDB / MySQL")]
+        DBZ1["Debezium CDC 一次<br/>监听数据库变更"]
+        MQ["RabbitMQ<br/>独立队列隔离"]
+        A["① Source<br/>消费 MQ 消息"]
+        B["② Normalize<br/>解析为统一 Event 结构"]
+        C["③ Window Engine<br/>窗口分配 + 乱序容忍"]
+        D["④ Aggregation<br/>COUNT / SUM / AVG / UV / P99"]
+        DB --> DBZ1 --> MQ --> A --> B --> C --> D
     end
 
     subgraph DW["数仓加工层"]
@@ -28,18 +25,16 @@ flowchart LR
         ODS["ODS 层<br/>原始数据原样入库"]
         DWD["DWD 层<br/>清洗 + 关联维度表"]
         DWS["DWS 层<br/>多维度聚合汇总宽表"]
-        ADS["ADS 层<br/>漏斗 / 留存 / GMV / DAU<br/>BI 报表 / 对外 API"]
+        ADS["ADS 层<br/>漏斗 / 留存 / GMV / BI 报表"]
         ODS --> DWD --> DWS --> ADS
     end
 
-    ES["Elasticsearch<br/>查询数仓数据<br/>提供全文检索 / 监控看板"]
+    ES["Elasticsearch<br/>查询数仓数据<br/>全文检索 / 监控看板"]
+    DBZ2["Debezium CDC 二次<br/>监听数仓变更<br/>触发二次流式计算"]
 
-    DBZ2["Debezium CDC 二次<br/>监听数仓表变更<br/>触发二次流式计算"]
-
-    DB --> DBZ1 --> MQ --> A
     D -- "窗口结果写入" --> ODS
     ADS -- "数据同步" --> ES
-    DWS -- "数仓数据变更" --> DBZ2
+    DWS --> DBZ2
     DBZ2 -- "二次计算事件" --> MQ
 ```
 
