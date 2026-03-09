@@ -14,23 +14,29 @@ flowchart TB
     DBZ2["Debezium CDC 二次<br/>监听数仓变更<br/>触发二次流式计算"]
     ES["Elasticsearch<br/>查询数仓数据<br/>全文检索 / 监控看板"]
 
-    subgraph STREAM["流式统计模块"]
-        A["① Source<br/>消费 MQ 消息"]
-        B["② Normalize<br/>解析为统一 Event 结构"]
-        C["③ Window Engine<br/>窗口分配 + 乱序容忍"]
-        D["④ Aggregation<br/>COUNT / SUM / AVG / UV / P99"]
-        A --> B --> C --> D
+    DB --> DBZ1 --> MQ
+
+    subgraph MAIN[" "]
+        direction LR
+        subgraph STREAM["流式统计模块"]
+            direction TB
+            A["① Source<br/>消费 MQ 消息"]
+            B["② Normalize<br/>解析为统一 Event 结构"]
+            C["③ Window Engine<br/>窗口分配 + 乱序容忍"]
+            D["④ Aggregation<br/>COUNT / SUM / AVG / UV / P99"]
+            A --> B --> C --> D
+        end
+        subgraph DW["数仓加工层"]
+            direction TB
+            ODS["ODS 层<br/>原始数据原样入库"]
+            DWD["DWD 层<br/>清洗 + 关联维度表"]
+            DWS["DWS 层<br/>多维度聚合汇总宽表"]
+            ADS["ADS 层<br/>漏斗 / 留存 / GMV / BI 报表"]
+            ODS --> DWD --> DWS --> ADS
+        end
     end
 
-    subgraph DW["数仓加工层"]
-        ODS["ODS 层<br/>原始数据原样入库"]
-        DWD["DWD 层<br/>清洗 + 关联维度表"]
-        DWS["DWS 层<br/>多维度聚合汇总宽表"]
-        ADS["ADS 层<br/>漏斗 / 留存 / GMV / BI 报表"]
-        ODS --> DWD --> DWS --> ADS
-    end
-
-    DB --> DBZ1 --> MQ --> A
+    MQ --> A
     D -- "窗口结果写入" --> ODS
     ADS -- "数据同步" --> ES
     DWS --> DBZ2
