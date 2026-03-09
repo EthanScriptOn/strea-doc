@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+  <style>
+    body { font-family: sans-serif; padding: 40px; background: #fff; }
+    h2 { color: #333; }
+    .mermaid { margin-bottom: 60px; }
+  </style>
+</head>
+<body>
+
+  <h2>整体数据流</h2>
+  <div class="mermaid">
+flowchart LR
+    DB[("业务数据库<br/>MongoDB / MySQL")]
+    DBZ1["Debezium CDC 一次<br/>监听数据库变更"]
+    MQ["RabbitMQ<br/>独立队列隔离"]
+    DBZ2["Debezium CDC 二次<br/>监听数仓变更<br/>触发二次流式计算"]
+    ES["Elasticsearch<br/>查询数仓数据<br/>全文检索 / 监控看板"]
+
+    subgraph STREAM["流式统计模块"]
+        direction TB
+        A["① Source<br/>消费 MQ 消息"]
+        B["② Normalize<br/>解析为统一 Event 结构"]
+        C["③ Window Engine<br/>窗口分配 + 乱序容忍"]
+        D["④ Aggregation<br/>COUNT / SUM / AVG / UV / P99"]
+        A --> B --> C --> D
+    end
+
+    subgraph DW["数仓加工层"]
+        direction TB
+        ODS["ODS 层<br/>原始数据原样入库"]
+        DWD["DWD 层<br/>清洗 + 关联维度表"]
+        DWS["DWS 层<br/>多维度聚合汇总宽表"]
+        ADS["ADS 层<br/>漏斗 / 留存 / GMV / BI 报表"]
+        ODS --> DWD --> DWS --> ADS
+    end
+
+    DB --> DBZ1 --> MQ --> STREAM
+    D -- "窗口结果写入" --> ODS
+    ADS -- "数据同步" --> ES
+    DWS --> DBZ2
+    DBZ2 -- "二次计算事件" --> MQ
+  </div>
+
+  <h2>二次计算说明</h2>
+  <div class="mermaid">
+flowchart LR
+    DWS[("数仓 DWS / ADS 层<br/>聚合结果落地")]
+    DBZ2["Debezium CDC 二次<br/>监听数仓表 INSERT / UPDATE<br/>封装为新的 CDC 事件"]
+    MQ["RabbitMQ<br/>同一队列复用<br/>或配置独立队列隔离"]
+    STREAM["流式统计模块<br/>复用同一套 Pipeline<br/>通过 source-filter 区分<br/>一次 / 二次计算事件"]
+    OUT["输出<br/>二次聚合结果写回数仓<br/>或写入独立指标表"]
+    DWS --> DBZ2 --> MQ --> STREAM --> OUT
+  </div>
+
+  <h2>Replay 历史重算</h2>
+  <div class="mermaid">
+flowchart LR
+    RP["Replayer<br/>按时间范围读取历史事件<br/>绕过 RabbitMQ 重新投入 Pipeline"]
+    ISO["隔离输出<br/>ES 独立 index 后缀 _replay<br/>数仓独立表名后缀 _replay<br/>不覆盖任何线上数据"]
+    RP --> ISO
+  </div>
+
+  <script>mermaid.initialize({ startOnLoad: true, theme: 'default' })</script>
+</body>
+</html>
